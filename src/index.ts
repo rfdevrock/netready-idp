@@ -40,7 +40,7 @@ interface AccessCard {
   accessCardId: string;
 }
 
-interface NetreadyConfig {
+interface NetReadyConfig {
   baseUrl: string;
   apiKey: string;
   accessCard: string;
@@ -60,7 +60,7 @@ const client = wrapper(axios.create({ jar }));
  * @param config Connection settings
  * @param email
  */
-async function validateEmail(config: NetreadyConfig, email: string): Promise<boolean> {
+async function validateEmail(config: NetReadyConfig, email: string): Promise<boolean> {
   try {
     const {
       data: { isTaken },
@@ -77,7 +77,7 @@ async function validateEmail(config: NetreadyConfig, email: string): Promise<boo
  * @param config Connection settings
  * @param user username and password
  */
-async function login(config: NetreadyConfig, user: LoginRequest) {
+async function login(config: NetReadyConfig, user: LoginRequest) {
   try {
     const validEmail = await validateEmail(config, user.username);
 
@@ -123,7 +123,7 @@ async function login(config: NetreadyConfig, user: LoginRequest) {
  * @param config Connection settings
  * @param req Express.Request
  */
-async function userInfo(config: NetreadyConfig, req: Request) {
+async function userInfo(config: NetReadyConfig, req: Request) {
   try {
     if (req.user && Object.keys(req.user).length) {
       const { userId, code, accessCard, proCard } = <SessionUser>req.user;
@@ -153,7 +153,7 @@ async function userInfo(config: NetreadyConfig, req: Request) {
  */
 
 async function getNetreadyUser(
-    config: NetreadyConfig,
+    config: NetReadyConfig,
     req: Request,
     user?: LoginRequest,
 ) {
@@ -163,4 +163,4 @@ async function getNetreadyUser(
   return userInfo(config, req);
 }
 
-export { validateEmail, login, userInfo, getNetreadyUser };
+export { validateEmail, login, userInfo, getNetreadyUser, NetReadyConfig };
