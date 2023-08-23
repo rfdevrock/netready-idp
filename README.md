@@ -16,10 +16,10 @@ Example:
 
 ```ts
 const connectionConfig: NetreadyConfig = {
-    baseUrl: 'https://host.com/api/v1',
-    apiKey: '0nYk5PJZdrroZX13S7e0K4Xt7Wrjo%2B6zHrXPrgu5V5vLfm7actsE5OYQrPe6JjVQ',
-    accessCard: 'EB4A7E7D-8EDB-48FF-A89C-4B9333D3A0E2',
-    accessPro: 'DD8F5014-828E-4CDB-96D6-F65165CDCB8',
+    baseUrl: 'https://XXXXX.netready.app/api/v1',
+    apiKey: '0nYk...jVQ',
+    accessCard: 'EBT...0E2',
+    accessPro: 'DD8...CB8',
     authCookie: 'gappstack_auth',
 }
 ```
