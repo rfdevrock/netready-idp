@@ -23,7 +23,7 @@
     "auth",
     "authorisation"
   ],
-  "author": "emp74ark",
+  "author": "RapidFunnel",
   "license": "MIT",
   "dependencies": {
     "axios": "^1.4.0",
