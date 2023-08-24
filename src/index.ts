@@ -125,7 +125,7 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
  */
 async function userInfo(config: NetReadyConfig, req: Request) {
   try {
-    if (req.user && Object.keys(req.user).length) {
+    if (req.user) {
       const { userId, code, accessCard, proCard } = <SessionUser>req.user;
       const { data: user } = await client.get<UserResponse>(
         `${config.baseUrl}/user/users/${userId}/?apiKey=${config.apiKey}`,
