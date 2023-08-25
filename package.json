@@ -1,7 +1,7 @@
 {
   "name": "netready-idp",
   "description": "NetReady authorisation module for PassportJs",
-  "version": "1.0.2",
+  "version": "1.0.5",
   "type": "module",
   "main": "lib/cjs/index.js",
   "module": "lib/mjs/index.js",
@@ -17,12 +17,13 @@
     "build": "rimraf ./lib && npm run build:cjs && npm run build:mjs && bash ./dist",
     "build:cjs": "tsc -p tsconfig-cjs.json",
     "build:mjs": "tsc -p tsconfig.json",
-    "publish": "npm publish"
+    "publish": "npm publish --access public"
   },
   "keywords": [
     "netready",
     "auth",
-    "authorisation"
+    "authorisation",
+    "express"
   ],
   "author": "RapidFunnel",
   "license": "MIT",
