@@ -4,15 +4,17 @@
 
 This package implements authorization and access to user information from [NetReady](https://netready.co.za/).
 
+The package developed by [RapidFunnel](https://rapidfunnel.com/) company for NetReady.
+
 ## Installation
 
 ```bash
 npm install netready-idp
 ```
 
-## Config
+## Configuration
 
-Configuration file should have next fields:
+Configuration has to have the next fields:
 
 ```text
   baseUrl: string,
@@ -34,7 +36,9 @@ const connectionConfig: NetreadyConfig = {
 }
 ```
 
-## Email validation
+## Usage
+
+### Email validation
 
 When a user logs into the App, the email is first validated against the Dream Team database
 to ensure that the user exists.
@@ -48,9 +52,9 @@ validateEmail(
 
 Returns boolean.
 
-If error occurs, throw error with message _NetReady email validation failed_.
+In any error case it throws error with message _NetReady email validation failed_.
 
-## Login
+### Login
 
 ```typescript
 login(
@@ -59,36 +63,45 @@ login(
 );
 ```
 
-If success, returns user object, otherwise - false.
+If success it returns user object. Otherwise, it returns false.
 
-User object contains additionally fields, needed for PassportJs session:
+The user object contains additionally fields which will be needed for PassportJs session:
 
-- code: access cookie;
+- code: string (access code);
 - accessCard: boolean (if true, user must have the Connector Access Card to use the App);
 - proCard: boolean (if true, user must have the Pro Access card to have the Pro version of the App);
 
-If error occurs, throw error with message _NetReady login failed_.
+In any error case it throws error with message _NetReady login failed_.
 
-## Get user information
+### Get user information
+
+The general representation of the function:
 
 ```ts
-userInfo(
+getNetreadyUser(
     config: NetreadyConfig,
-    request: Request
+    request: Request,
+    user?: {
+        username: string;
+        password?: string;
+    }
 )
 ```
 
-_request here should have type Request imported from Express_
+#### Usage in Express session
 
-Get user information from PassportJs session and validate it.
+If you have started express session the function can be used like:
 
-If information is valid, returns user object, otherwise - false.
+```ts
+getNetreadyUser(
+    config: NetreadyConfig,
+    request: Request,
+)
+```
 
-If error occurs, throw error with message _NetReady login failed_.
+#### Usage with user credentials
 
-## Get user information
-
-Function **getNetreadyUser** unite all functions above in one
+If username and password defined, user information can be got by the following:
 
 ```ts
 getNetreadyUser(
@@ -100,10 +113,26 @@ getNetreadyUser(
     }
 )
 ```
+
 _request here should have type Request imported from Express_
 
-Returns user object. If _user_ in not defined, will try to sign in, otherwise will try to get user information from
-PassportJs session and validate it. In case of unsuccessful sign-in or invalid data _false_ should be returned.
+In such case, **getNetreadyUser** automatically login and get user information. In case of unsuccessful login or invalid data _false_ should be returned.
+
+#### Get user information from session
+
+It gets user information from PassportJs session and validate it: 
+
+```ts
+userInfo(
+    config: NetreadyConfig,
+    request: Request
+)
+```
+
+If information is valid it returns user object. Otherwise, it returns false.
+
+_request here should have type Request imported from Express_
+
 
 #  Examples
 
@@ -157,4 +186,4 @@ export default passport;
 
 # License
 
-[MIT](https://opensource.org/license/mit/)
+netready-idp is distributed under [MIT](https://opensource.org/license/mit/) license.
