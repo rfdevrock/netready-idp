@@ -14,6 +14,8 @@ npm install netready-idp
 
 ## Configuration
 
+All these parameters depends on you company, and you should get them from NetReady.
+
 Configuration has to have the next fields:
 
 ```text
@@ -23,15 +25,21 @@ Configuration has to have the next fields:
   accessPro: string,
   authCookie: string
 ```
+Description:
+- **baseUrl**: base URL to your company NetReady IDP, like 'https://XXXX.netready.app/api/v1' where 'XXXX' depends on your company;
+- **apiKey**: Encoded API Key for your company;
+- **accessCard**: Connector Access Card to use the App that the user must have;
+- **accessPro**: Pro Access card to have the Pro version of the App that the user must have;
+- **authCookie**: cookie name that returns NetReady IDP API, usually it has name 'gappstack_auth'.
 
 Example:
 
 ```typescript
 const connectionConfig: NetreadyConfig = {
-    baseUrl: 'https://XXXXX.netready.app/api/v1',
-    apiKey: '0nYk...jVQ',
-    accessCard: 'EBT...0E2',
-    accessPro: 'DD8...CB8',
+    baseUrl: 'https://1030.netready.app/api/v1',
+    apiKey: 'ZzhRdTMynBiKSCX3O7Akm7hRCgb4sUI7bU-Yuyq6YiFQTZxilYbGYHCeICl6wDIjpA',
+    accessCard: '7C64E2F6-0BB0-49B8-830E-B24A44A79B5A',
+    accessPro: 'FE574117-C35F-4219-85D3-4CB5E5DF305A',
     authCookie: 'gappstack_auth',
 }
 ```
@@ -67,9 +75,9 @@ If success it returns user object. Otherwise, it returns false.
 
 The user object contains additionally fields which will be needed for PassportJs session:
 
-- code: string (access code);
-- accessCard: boolean (if true, user must have the Connector Access Card to use the App);
-- proCard: boolean (if true, user must have the Pro Access card to have the Pro version of the App);
+- **code**: string (access code);
+- **accessCard**: boolean (if true, user must have the Connector Access Card to use the App);
+- **proCard**: boolean (if true, user must have the Pro Access card to have the Pro version of the App);
 
 In any error case it throws error with message _NetReady login failed_.
 
@@ -144,11 +152,11 @@ import { IStrategyOptionsWithRequest, Strategy } from 'passport-local';
 import { getNetreadyUser, NetReadyConfig } from 'netready-idp';
 
 const connectionConfig: NetReadyConfig = {
-  baseUrl: 'https://XXX.netready.app/api/v1',
-  apiKey: '0nY...jVQ',
-  accessCard: 'EB4...0E2',
-  accessPro: 'DD8...CB8',
-  authCookie: 'gappstack_auth',
+    baseUrl: 'https://1030.netready.app/api/v1',
+    apiKey: 'ZzhRdTMynBiKSCX3O7Akm7hRCgb4sUI7bU-Yuyq6YiFQTZxilYbGYHCeICl6wDIjpA',
+    accessCard: '7C64E2F6-0BB0-49B8-830E-B24A44A79B5A',
+    accessPro: 'FE574117-C35F-4219-85D3-4CB5E5DF305A',
+    authCookie: 'gappstack_auth',
 };
 
 const strategySignupOptions: IStrategyOptionsWithRequest = {
