@@ -3,12 +3,14 @@
 #   Add package.json files to cjs/mjs subtrees
 #
 
+cp ./src/template.html ./lib/cjs
 cat >lib/cjs/package.json <<!EOF
 {
     "type": "commonjs"
 }
 !EOF
 
+cp ./src/template.html ./lib/mjs
 cat >lib/mjs/package.json <<!EOF
 {
     "type": "module"

@@ -1,7 +1,8 @@
-import {Request} from 'express'
+import {Request} from 'express';
 import axios, {AxiosRequestConfig} from 'axios';
 import {wrapper} from 'axios-cookiejar-support';
 import {CookieJar} from 'tough-cookie';
+import {readFile} from 'fs/promises';
 
 // Interfaces
 
@@ -68,7 +69,7 @@ async function validateEmail(config: NetReadyConfig, email: string): Promise<boo
 
     return isTaken;
   } catch (e) {
-    throw new Error(`NetReady ${email} validation failed`, {cause: e});
+    throw new Error(`NetReady ${email} validation failed`, { cause: e });
   }
 }
 
@@ -114,7 +115,7 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
 
     return false;
   } catch (e) {
-    throw new Error('NetReady login failed', {cause: e});
+    throw new Error('NetReady login failed', { cause: e });
   }
 }
 
@@ -138,7 +139,7 @@ async function userInfo(config: NetReadyConfig, req: Request) {
       return false;
     }
   } catch (e) {
-    throw new Error('Access to NetReady user info failed', {cause: e});
+    throw new Error('Access to NetReady user info failed', { cause: e });
   }
 }
 
@@ -152,15 +153,25 @@ async function userInfo(config: NetReadyConfig, req: Request) {
  * @param user Passport session user
  */
 
-async function getNetreadyUser(
-    config: NetReadyConfig,
-    req: Request,
-    user?: LoginRequest,
-) {
+async function getNetreadyUser(config: NetReadyConfig, req: Request, user?: LoginRequest) {
   if (user) {
     return login(config, user);
   }
   return userInfo(config, req);
 }
 
-export { validateEmail, login, userInfo, getNetreadyUser, NetReadyConfig };
+/**
+ * Generate HTML page with form for login/signup
+ * @param label A title of the page
+ * @param dataPath The path where login and password should be validated
+ * @param redirectPath Path, where user should be redirected after login/signup process
+ */
+async function generateHtml(label: string, dataPath: string, redirectPath: string) {
+  const template = await readFile(`${__dirname}/template.html`, 'utf-8');
+  return template
+    .replaceAll('%HEADER%', label)
+    .replace('%DATA_PATH%', dataPath)
+    .replace('%REDIRECT_PATH%', redirectPath);
+}
+
+export { validateEmail, login, userInfo, getNetreadyUser, NetReadyConfig, generateHtml };

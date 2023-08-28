@@ -141,6 +141,29 @@ If information is valid it returns user object. Otherwise, it returns false.
 
 _request here should have type Request imported from Express_
 
+#### HTML form for getting user information
+
+Function **generateHtml** returns HTML page with form for getting user information. It needs next parameters:
+- **label**: string  - header and title of HTML page;
+- **dataPath**: string - web address where to send username/password;
+- **redirectPath**: string - web address where user should be redirected after login/signup.
+
+_Example usage with express:_
+
+```typescript
+app.get(
+    '/netready',
+    async (req: Request, res: Response) => {
+        const html = await generateHtml(
+            'NetReady', // title
+            '/api/auth/netready', // endpoint for user data validation
+            '/start' // redirection path
+        );
+        res.send(html);
+    }
+);
+```
+
 
 #  Examples
 
