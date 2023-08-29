@@ -1,5 +1,5 @@
 import {Request} from 'express';
-import axios, {AxiosRequestConfig} from 'axios';
+import axios, {AxiosError, AxiosRequestConfig} from 'axios';
 import {wrapper} from 'axios-cookiejar-support';
 import {CookieJar} from 'tough-cookie';
 import {readFile} from 'fs/promises';
@@ -69,6 +69,9 @@ async function validateEmail(config: NetReadyConfig, email: string): Promise<boo
 
     return isTaken;
   } catch (e) {
+    if (e instanceof AxiosError) {
+      return false;
+    }
     throw new Error(`NetReady ${email} validation failed`, { cause: e });
   }
 }
@@ -95,26 +98,32 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
         }
       >(`${config.baseUrl}/user/login?apiKey=${config.apiKey}`, user);
 
-      // get access cards
-      const { data: accessCards } = await client.get<AccessCard[]>(
-        `${config.baseUrl}/user/users/${userInfo.userId}/accessCards?apiKey=${config.apiKey}`,
-      );
-      // get access cookie for future access without credentials
-      const cookies = <Cookie[]>jar?.toJSON().cookies;
-      const code = cookies.find((c) => c.key === config.authCookie);
+      if (userInfo) {
+        // get access cards
+        const { data: accessCards } = await client.get<AccessCard[]>(
+          `${config.baseUrl}/user/users/${userInfo.userId}/accessCards?apiKey=${config.apiKey}`,
+        );
 
-      if (code) {
-        return {
-          ...userInfo,
-          accessCard: !!accessCards.find((card) => card.accessCardId === config.accessCard),
-          proCard: !!accessCards.find((card) => card.accessCardId === config.accessPro),
-          code: code.value,
-        };
+        // get access cookie for future access without credentials
+        const cookies = <Cookie[]>jar?.toJSON().cookies;
+        const code = cookies.find((c) => c.key === config.authCookie);
+
+        if (code) {
+          return {
+            ...userInfo,
+            accessCard: !!accessCards.find((card) => card.accessCardId === config.accessCard),
+            proCard: !!accessCards.find((card) => card.accessCardId === config.accessPro),
+            code: code.value,
+          };
+        }
       }
     }
 
     return false;
   } catch (e) {
+    if (e instanceof AxiosError) {
+      return false;
+    }
     throw new Error('NetReady login failed', { cause: e });
   }
 }
@@ -135,10 +144,14 @@ async function userInfo(config: NetReadyConfig, req: Request) {
         },
       );
       return { ...user, code, accessCard, proCard };
-    } else {
+    }
+
+    return false;
+  } catch (e) {
+    if (e instanceof AxiosError) {
       return false;
     }
-  } catch (e) {
+
     throw new Error('Access to NetReady user info failed', { cause: e });
   }
 }
@@ -154,10 +167,14 @@ async function userInfo(config: NetReadyConfig, req: Request) {
  */
 
 async function getNetreadyUser(config: NetReadyConfig, req: Request, user?: LoginRequest) {
-  if (user) {
-    return login(config, user);
+  try {
+    if (user) {
+      return login(config, user);
+    }
+    return userInfo(config, req);
+  } catch {
+    return false;
   }
-  return userInfo(config, req);
 }
 
 /**
