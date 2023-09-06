@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>%HEADER%</title>
     <style>
         body {
@@ -14,6 +14,7 @@
             flex-direction: column;
             font-family: arial, sans-serif;
         }
+
         form {
             display: flex;
             flex-direction: column;
@@ -23,14 +24,22 @@
             border-radius: 1em;
             padding: 1em;
         }
+
         input {
             border-radius: .3em;
             padding: .3em;
+        }
+
+        h2 {
+            color: brown;
+            font-size: medium;
+            font-style: italic;
         }
     </style>
 </head>
 <body>
 <h1>%HEADER%</h1>
+<h2 style="display: none" id="alert">Check login or password</h2>
 <form id="form">
     <span>Username</span>
     <input type="email" name="username" id="username">
@@ -40,6 +49,14 @@
 </form>
 
 <script>
+    const alert = document.getElementById('alert');
+
+    if (window.location.href.includes('result=error')) {
+        alert.style.display = 'block'
+    } else {
+        alert.style.display = 'none'
+    }
+
     const username = document.getElementById('username');
     const password = document.getElementById('password');
     document.addEventListener('submit', async (e) => {
