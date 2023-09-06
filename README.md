@@ -148,6 +148,8 @@ Function **generateHtml** returns HTML page with form for getting user informati
 - **dataPath**: string - web address where to send username/password;
 - **redirectPath**: string - web address where user should be redirected after login/signup.
 
+If **redirectPath** contains _result=error_ query parameter, error with text _'Check login or password'_ above the login form should be shown. 
+
 _Example usage with express:_
 
 ```typescript
