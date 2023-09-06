@@ -49,6 +49,15 @@ interface NetReadyConfig {
   authCookie: string;
 }
 
+// Custom error
+
+class NetReadyError extends Error {
+  constructor(message: string, options: ErrorOptions) {
+    super(message, options);
+    this.name = 'NetReadyError';
+  }
+}
+
 // Axios instance
 
 const jar = new CookieJar();
@@ -72,7 +81,7 @@ async function validateEmail(config: NetReadyConfig, email: string): Promise<boo
     if (e instanceof AxiosError) {
       return false;
     }
-    throw new Error(`NetReady ${email} validation failed`, { cause: e });
+    throw new NetReadyError(`NetReady ${email} validation failed`, { cause: e });
   }
 }
 
@@ -124,7 +133,7 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
     if (e instanceof AxiosError) {
       return false;
     }
-    throw new Error('NetReady login failed', { cause: e });
+    throw new NetReadyError('NetReady login failed', { cause: e });
   }
 }
 
@@ -152,7 +161,7 @@ async function userInfo(config: NetReadyConfig, req: Request) {
       return false;
     }
 
-    throw new Error('Access to NetReady user info failed', { cause: e });
+    throw new NetReadyError('Access to NetReady user info failed', { cause: e });
   }
 }
 
