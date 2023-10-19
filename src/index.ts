@@ -39,6 +39,12 @@ interface Cookie {
 interface AccessCard {
   userId: number;
   accessCardId: string;
+  accessCardName: string;
+}
+
+enum AccessCardName {
+  connector = 'Connector',
+  pro = 'Pro Connector'
 }
 
 interface NetReadyConfig {
@@ -61,7 +67,7 @@ class NetReadyError extends Error {
 // Axios instance
 
 const jar = new CookieJar();
-const client = wrapper(axios.create({ jar }));
+const client = wrapper(axios.create({jar}));
 
 // Connections
 
@@ -70,18 +76,20 @@ const client = wrapper(axios.create({ jar }));
  * @param config Connection settings
  * @param email
  */
-async function validateEmail(config: NetReadyConfig, email: string): Promise<boolean> {
+async function validateEmail(
+    config: NetReadyConfig, email: string): Promise<boolean> {
   try {
     const {
-      data: { isTaken },
-    } = await client.get<ValidateResponse>(`${config.baseUrl}/validate/email?apiKey=${config.apiKey}&email=${email}`);
+      data: {isTaken},
+    } = await client.get<ValidateResponse>(
+        `${config.baseUrl}/validate/email?apiKey=${config.apiKey}&email=${email}`);
 
     return isTaken;
   } catch (e) {
     if (e instanceof AxiosError) {
       return false;
     }
-    throw new NetReadyError(`NetReady ${email} validation failed`, { cause: e });
+    throw new NetReadyError(`NetReady ${email} validation failed`, {cause: e});
   }
 }
 
@@ -98,19 +106,19 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
       // login and get cookies
       const {
         data: userInfo,
-        config: { jar },
+        config: {jar},
       } = await client.post<
-        LoginRequest,
-        {
-          data: UserResponse;
-          config: AxiosRequestConfig;
-        }
+          LoginRequest,
+          {
+            data: UserResponse;
+            config: AxiosRequestConfig;
+          }
       >(`${config.baseUrl}/user/login?apiKey=${config.apiKey}`, user);
 
       if (userInfo) {
         // get access cards
-        const { data: accessCards } = await client.get<AccessCard[]>(
-          `${config.baseUrl}/user/users/${userInfo.userId}/accessCards?apiKey=${config.apiKey}`,
+        const {data: accessCards} = await client.get<AccessCard[]>(
+            `${config.baseUrl}/user/users/${userInfo.userId}/accessCards?apiKey=${config.apiKey}`,
         );
 
         // get access cookie for future access without credentials
@@ -118,10 +126,23 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
         const code = cookies.find((c) => c.key === config.authCookie);
 
         if (code) {
+          const accessCard = !!accessCards.find(({
+                accessCardId,
+                accessCardName,
+              }) => accessCardName === AccessCardName.connector &&
+                  accessCardId === config.accessCard,
+          );
+          const proCard = !!accessCards.find(
+              ({
+                accessCardId,
+                accessCardName,
+              }) => accessCardName === AccessCardName.pro &&
+                  accessCardId === config.accessPro,
+          );
           return {
             ...userInfo,
-            accessCard: !!accessCards.find((card) => card.accessCardId === config.accessCard),
-            proCard: !!accessCards.find((card) => card.accessCardId === config.accessPro),
+            accessCard,
+            proCard,
             code: code.value,
           };
         }
@@ -133,7 +154,7 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
     if (e instanceof AxiosError) {
       return false;
     }
-    throw new NetReadyError('NetReady login failed', { cause: e });
+    throw new NetReadyError('NetReady login failed', {cause: e});
   }
 }
 
@@ -145,14 +166,14 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
 async function userInfo(config: NetReadyConfig, req: Request) {
   try {
     if (req.user) {
-      const { userId, code, accessCard, proCard } = <SessionUser>req.user;
-      const { data: user } = await client.get<UserResponse>(
-        `${config.baseUrl}/user/users/${userId}/?apiKey=${config.apiKey}`,
-        {
-          headers: { Cookie: `${config.authCookie}=${code}` },
-        },
+      const {userId, code, accessCard, proCard} = <SessionUser>req.user;
+      const {data: user} = await client.get<UserResponse>(
+          `${config.baseUrl}/user/users/${userId}/?apiKey=${config.apiKey}`,
+          {
+            headers: {Cookie: `${config.authCookie}=${code}`},
+          },
       );
-      return { ...user, code, accessCard, proCard };
+      return {...user, code, accessCard, proCard};
     }
 
     return false;
@@ -161,7 +182,7 @@ async function userInfo(config: NetReadyConfig, req: Request) {
       return false;
     }
 
-    throw new NetReadyError('Access to NetReady user info failed', { cause: e });
+    throw new NetReadyError('Access to NetReady user info failed', {cause: e});
   }
 }
 
@@ -175,7 +196,8 @@ async function userInfo(config: NetReadyConfig, req: Request) {
  * @param user Passport session user
  */
 
-async function getNetreadyUser(config: NetReadyConfig, req: Request, user?: LoginRequest) {
+async function getNetreadyUser(
+    config: NetReadyConfig, req: Request, user?: LoginRequest) {
   try {
     if (user) {
       return login(config, user);
@@ -192,12 +214,19 @@ async function getNetreadyUser(config: NetReadyConfig, req: Request, user?: Logi
  * @param dataPath The path where login and password should be validated
  * @param redirectPath Path, where user should be redirected after login/signup process
  */
-async function generateHtml(label: string, dataPath: string, redirectPath: string) {
+async function generateHtml(
+    label: string, dataPath: string, redirectPath: string) {
   const template = await readFile(`${__dirname}/template.html`, 'utf-8');
-  return template
-    .replaceAll('%HEADER%', label)
-    .replace('%DATA_PATH%', dataPath)
-    .replace('%REDIRECT_PATH%', redirectPath);
+  return template.replaceAll('%HEADER%', label).
+      replace('%DATA_PATH%', dataPath).
+      replace('%REDIRECT_PATH%', redirectPath);
 }
 
-export { validateEmail, login, userInfo, getNetreadyUser, NetReadyConfig, generateHtml };
+export {
+  validateEmail,
+  login,
+  userInfo,
+  getNetreadyUser,
+  NetReadyConfig,
+  generateHtml,
+};
