@@ -94,6 +94,40 @@ async function validateEmail(
 }
 
 /**
+ * Get user access cards
+ * @param config Connection settings
+ * @param userId user ID from NetReady
+ */
+async function accessCards(config: NetReadyConfig, userId: number) {
+  try {
+    const {data: accessCards} = await client.get<AccessCard[]>(
+        `${config.baseUrl}/user/users/${userId}/accessCards?apiKey=${config.apiKey}`,
+    );
+
+    const accessCard = !!accessCards.find(({
+          accessCardId,
+          accessCardName,
+        }) => accessCardName === AccessCardName.connector &&
+            accessCardId === config.accessCard,
+    );
+    const proCard = !!accessCards.find(
+        ({
+          accessCardId,
+          accessCardName,
+        }) => accessCardName === AccessCardName.pro &&
+            accessCardId === config.accessPro,
+    );
+
+    return {accessCard, proCard};
+  } catch (e) {
+    if (e instanceof AxiosError) {
+      return false;
+    }
+    throw new NetReadyError('Getting access cards failed', {cause: e});
+  }
+}
+
+/**
  * Login to NetReady and check access to app
  * @param config Connection settings
  * @param user username and password
@@ -116,33 +150,16 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
       >(`${config.baseUrl}/user/login?apiKey=${config.apiKey}`, user);
 
       if (userInfo) {
-        // get access cards
-        const {data: accessCards} = await client.get<AccessCard[]>(
-            `${config.baseUrl}/user/users/${userInfo.userId}/accessCards?apiKey=${config.apiKey}`,
-        );
-
         // get access cookie for future access without credentials
         const cookies = <Cookie[]>jar?.toJSON().cookies;
         const code = cookies.find((c) => c.key === config.authCookie);
+        const cards = await accessCards(config, userInfo.userId);
 
-        if (code) {
-          const accessCard = !!accessCards.find(({
-                accessCardId,
-                accessCardName,
-              }) => accessCardName === AccessCardName.connector &&
-                  accessCardId === config.accessCard,
-          );
-          const proCard = !!accessCards.find(
-              ({
-                accessCardId,
-                accessCardName,
-              }) => accessCardName === AccessCardName.pro &&
-                  accessCardId === config.accessPro,
-          );
+        if (code && cards) {
           return {
             ...userInfo,
-            accessCard,
-            proCard,
+            accessCard: cards.accessCard,
+            proCard: cards.proCard,
             code: code.value,
           };
         }
@@ -166,14 +183,25 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
 async function userInfo(config: NetReadyConfig, req: Request) {
   try {
     if (req.user) {
-      const {userId, code, accessCard, proCard} = <SessionUser>req.user;
-      const {data: user} = await client.get<UserResponse>(
-          `${config.baseUrl}/user/users/${userId}/?apiKey=${config.apiKey}`,
-          {
-            headers: {Cookie: `${config.authCookie}=${code}`},
-          },
-      );
-      return {...user, code, accessCard, proCard};
+      const {userId, code} = <SessionUser>req.user;
+      const cards = await accessCards(config, userId);
+
+      if (cards) {
+        const {data: user} = await client.get<UserResponse>(
+            `${config.baseUrl}/user/users/${userId}/?apiKey=${config.apiKey}`,
+            {
+              headers: {Cookie: `${config.authCookie}=${code}`},
+            },
+        );
+
+        return {
+          ...user,
+          code,
+          accessCard: cards.accessCard,
+          proCard: cards.proCard,
+        };
+      }
+
     }
 
     return false;
@@ -181,7 +209,6 @@ async function userInfo(config: NetReadyConfig, req: Request) {
     if (e instanceof AxiosError) {
       return false;
     }
-
     throw new NetReadyError('Access to NetReady user info failed', {cause: e});
   }
 }
