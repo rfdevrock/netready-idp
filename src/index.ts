@@ -1,8 +1,8 @@
-import {Request} from 'express';
-import axios, {AxiosError, AxiosRequestConfig} from 'axios';
-import {wrapper} from 'axios-cookiejar-support';
-import {CookieJar} from 'tough-cookie';
-import {readFile} from 'fs/promises';
+import { Request } from 'express';
+import axios, { AxiosError, AxiosRequestConfig } from 'axios';
+import { wrapper } from 'axios-cookiejar-support';
+import { CookieJar } from 'tough-cookie';
+import { readFile } from 'fs/promises';
 
 // Interfaces
 
@@ -67,7 +67,7 @@ class NetReadyError extends Error {
 // Axios instance
 
 const jar = new CookieJar();
-const client = wrapper(axios.create({jar}));
+const client = wrapper(axios.create({ jar }));
 
 // Connections
 
@@ -77,19 +77,22 @@ const client = wrapper(axios.create({jar}));
  * @param email
  */
 async function validateEmail(
-    config: NetReadyConfig, email: string): Promise<boolean> {
+  config: NetReadyConfig, email: string): Promise<boolean> {
   try {
+    const encodedEmail = encodeURIComponent(email);
+
     const {
-      data: {isTaken},
+      data: { isTaken },
     } = await client.get<ValidateResponse>(
-        `${config.baseUrl}/validate/email?apiKey=${config.apiKey}&email=${email}`);
+      `${config.baseUrl}/validate/email?apiKey=${config.apiKey}&email=${encodedEmail}`);
 
     return isTaken;
   } catch (e) {
     if (e instanceof AxiosError) {
       return false;
     }
-    throw new NetReadyError(`NetReady ${email} validation failed`, {cause: e});
+    throw new NetReadyError(`NetReady ${email} validation failed`,
+      { cause: e });
   }
 }
 
@@ -100,30 +103,30 @@ async function validateEmail(
  */
 async function accessCards(config: NetReadyConfig, userId: number) {
   try {
-    const {data: accessCards} = await client.get<AccessCard[]>(
-        `${config.baseUrl}/user/users/${userId}/accessCards?apiKey=${config.apiKey}`,
+    const { data: accessCards } = await client.get<AccessCard[]>(
+      `${config.baseUrl}/user/users/${userId}/accessCards?apiKey=${config.apiKey}`,
     );
 
     const accessCard = !!accessCards.find(({
-          accessCardId,
-          accessCardName,
-        }) => accessCardName === AccessCardName.connector &&
-            accessCardId === config.accessCard,
+        accessCardId,
+        accessCardName,
+      }) => accessCardName === AccessCardName.connector &&
+        accessCardId === config.accessCard,
     );
     const proCard = !!accessCards.find(
-        ({
-          accessCardId,
-          accessCardName,
-        }) => accessCardName === AccessCardName.pro &&
-            accessCardId === config.accessPro,
+      ({
+        accessCardId,
+        accessCardName,
+      }) => accessCardName === AccessCardName.pro &&
+        accessCardId === config.accessPro,
     );
 
-    return {accessCard, proCard};
+    return { accessCard, proCard };
   } catch (e) {
     if (e instanceof AxiosError) {
       return false;
     }
-    throw new NetReadyError('Getting access cards failed', {cause: e});
+    throw new NetReadyError('Getting access cards failed', { cause: e });
   }
 }
 
@@ -140,13 +143,13 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
       // login and get cookies
       const {
         data: userInfo,
-        config: {jar},
+        config: { jar },
       } = await client.post<
-          LoginRequest,
-          {
-            data: UserResponse;
-            config: AxiosRequestConfig;
-          }
+        LoginRequest,
+        {
+          data: UserResponse;
+          config: AxiosRequestConfig;
+        }
       >(`${config.baseUrl}/user/login?apiKey=${config.apiKey}`, user);
 
       if (userInfo) {
@@ -171,7 +174,7 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
     if (e instanceof AxiosError) {
       return false;
     }
-    throw new NetReadyError('NetReady login failed', {cause: e});
+    throw new NetReadyError('NetReady login failed', { cause: e });
   }
 }
 
@@ -183,15 +186,15 @@ async function login(config: NetReadyConfig, user: LoginRequest) {
 async function userInfo(config: NetReadyConfig, req: Request) {
   try {
     if (req.user) {
-      const {userId, code} = <SessionUser>req.user;
+      const { userId, code } = <SessionUser>req.user;
       const cards = await accessCards(config, userId);
 
       if (cards) {
-        const {data: user} = await client.get<UserResponse>(
-            `${config.baseUrl}/user/users/${userId}/?apiKey=${config.apiKey}`,
-            {
-              headers: {Cookie: `${config.authCookie}=${code}`},
-            },
+        const { data: user } = await client.get<UserResponse>(
+          `${config.baseUrl}/user/users/${userId}/?apiKey=${config.apiKey}`,
+          {
+            headers: { Cookie: `${config.authCookie}=${code}` },
+          },
         );
 
         return {
@@ -209,7 +212,8 @@ async function userInfo(config: NetReadyConfig, req: Request) {
     if (e instanceof AxiosError) {
       return false;
     }
-    throw new NetReadyError('Access to NetReady user info failed', {cause: e});
+    throw new NetReadyError('Access to NetReady user info failed',
+      { cause: e });
   }
 }
 
@@ -224,7 +228,7 @@ async function userInfo(config: NetReadyConfig, req: Request) {
  */
 
 async function getNetreadyUser(
-    config: NetReadyConfig, req: Request, user?: LoginRequest) {
+  config: NetReadyConfig, req: Request, user?: LoginRequest) {
   try {
     if (user) {
       return login(config, user);
@@ -242,11 +246,11 @@ async function getNetreadyUser(
  * @param redirectPath Path, where user should be redirected after login/signup process
  */
 async function generateHtml(
-    label: string, dataPath: string, redirectPath: string) {
+  label: string, dataPath: string, redirectPath: string) {
   const template = await readFile(`${__dirname}/template.html`, 'utf-8');
   return template.replaceAll('%HEADER%', label).
-      replace('%DATA_PATH%', dataPath).
-      replace('%REDIRECT_PATH%', redirectPath);
+    replace('%DATA_PATH%', dataPath).
+    replace('%REDIRECT_PATH%', redirectPath);
 }
 
 export {
