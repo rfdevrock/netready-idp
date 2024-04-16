@@ -41,9 +41,10 @@ const client = wrapper(axios.create({ jar }));
 // Connections
 
 /**
- * Validate email
+ * Validate email by NetReady
  * @param config Connection settings
  * @param email
+ * @returns if success {isTaken: boolean}, otherwise <ErrorResponse>
  */
 async function validateEmail(
   config: NetReadyConfig, email: string,
@@ -72,6 +73,7 @@ async function validateEmail(
  * Get user access cards
  * @param config Connection settings
  * @param userId user ID from NetReady
+ * @returns { accessCard: boolean, proCard: boolean }, otherwise: <ErrorResponse>
  */
 async function accessCards(config: NetReadyConfig, userId: number) {
   try {
@@ -109,6 +111,7 @@ async function accessCards(config: NetReadyConfig, userId: number) {
  * Login to NetReady and check access to app
  * @param config Connection settings
  * @param user username and password
+ * @returns if success <UserResponse>, otherwise <ErrorResponse>
  */
 async function login(
   config: NetReadyConfig,
@@ -167,9 +170,10 @@ async function login(
 }
 
 /**
- * If Passport session has user data, validate it, otherwise returns false
+ * Validate PassportJs session user data
  * @param config Connection settings
  * @param req Express.Request
+ * @returns if success <UserResponse>, otherwise <ErrorResponse>
  */
 async function userInfo(
   config: NetReadyConfig, req: Request): Promise<ErrorResponse | UserResponse> {
@@ -212,11 +216,11 @@ async function userInfo(
 /**
  * Returns user object. If user in not undefined, will try to sign in,
  * otherwise will try to get user information from PassportJs session
- * and validate it. In case of unsuccessful sign-in or invalid data false
- * should be returned.
+ * and validate it.
  * @param config Connection settings
  * @param req Express.Request
  * @param user Passport session user
+ * @returns if success <UserResponse>, otherwise <ErrorResponse>
  */
 
 async function getNetreadyUser(

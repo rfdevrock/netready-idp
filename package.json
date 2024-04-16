@@ -1,7 +1,7 @@
 {
   "name": "netready-idp",
   "description": "NetReady authorisation module for PassportJs",
-  "version": "1.0.12",
+  "version": "2.0.0",
   "type": "module",
   "main": "lib/cjs/index.js",
   "module": "lib/mjs/index.js",
