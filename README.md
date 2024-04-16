@@ -1,20 +1,25 @@
 # netready-idp
 
-## Introduction
-
 This package implements authorization and access to user information from [NetReady](https://netready.co.za/).
 
 The package developed by [RapidFunnel](https://rapidfunnel.com/) company for NetReady.
 
+## Content
+1. [Installation](#installation)
+2. [Configuration](#configuration)
+3. [Usage](#usage)
+4. [Errors](#errors)
+5. [Eamples](#examples)
+
 ## Installation
 
-```bash
+```shell
 npm install netready-idp
 ```
 
 ## Configuration
 
-All these parameters depends on you company, and you should get them from NetReady.
+All these parameters depend on your company, and you should get them from NetReady.
 
 Configuration has to have the next fields:
 
@@ -58,9 +63,7 @@ validateEmail(
 );
 ```
 
-Returns boolean.
-
-In any error case it throws error with message _NetReady email validation failed_.
+If success returns object ```{isTaken: boolean}```, otherwise error object ```<ErrorResponse>```.
 
 ### Login
 
@@ -71,15 +74,13 @@ login(
 );
 ```
 
-If success it returns user object. Otherwise, it returns false.
+If success it returns user object ```UserResponse```. Otherwise, it returns error object ```<ErrorResponse>```
 
-The user object contains additionally fields which will be needed for PassportJs session:
+The user object contains additional fields which will be needed for PassportJs session:
 
 - **code**: string (access code);
 - **accessCard**: boolean (if true, user must have the Connector Access Card to use the App);
 - **proCard**: boolean (if true, user must have the Pro Access card to have the Pro version of the App);
-
-In any error case it throws error with message _NetReady login failed_.
 
 ### Get user information
 
@@ -98,18 +99,18 @@ getNetreadyUser(
 
 #### Usage in Express session
 
-If you have started express session the function can be used like:
+If you have started express session, the function can be used like:
 
 ```ts
 getNetreadyUser(
     config: NetreadyConfig,
-    request: Request,
+    request: Request
 )
 ```
 
 #### Usage with user credentials
 
-If username and password defined, user information can be got by the following:
+If username and password are defined, user information can be got by the following:
 
 ```ts
 getNetreadyUser(
@@ -124,11 +125,13 @@ getNetreadyUser(
 
 _request here should have type Request imported from Express_
 
-In such case, **getNetreadyUser** automatically login and get user information. In case of unsuccessful login or invalid data _false_ should be returned.
+In such a case, **getNetreadyUser** automatically login and get user information.
+
+In case of unsuccessful login or invalid data should be returned error object ```<ErrorResponse>```.
 
 #### Get user information from session
 
-It gets user information from PassportJs session and validate it: 
+It gets user information from PassportJs session and validates it: 
 
 ```ts
 userInfo(
@@ -137,7 +140,7 @@ userInfo(
 )
 ```
 
-If information is valid it returns user object. Otherwise, it returns false.
+If information is valid, it returns a user object. Otherwise, it returns error object ```<ErrorResponse>```.
 
 _request here should have type Request imported from Express_
 
@@ -166,6 +169,20 @@ app.get(
 );
 ```
 
+# Errors
+
+Error types in the function responses enumerated in the _NetreadyErrorType_:
+```typescript
+enum NetreadyErrorType {
+  credentials = 'credentials',
+  validation = 'validation'
+}
+```
+
+* In case of positive response from the NetReady IDP functions should return data from this response.
+* In case of authorization error (HTTP status 403) should be returned error object: ```{ error: true, errorType: NetreadyErrorType.credentials }```
+* In case of authorization error (HTTP status 400) should be returned error object: ```{ error: true, errorType: NetreadyErrorType.validation }```
+* In all other cases ```<NetReadyError>``` should be thrown.
 
 #  Examples
 
@@ -199,7 +216,7 @@ passport.use(
         password,
       });
 
-      if (user) {
+      if (user.userId) {
         return done(null, user);
       }
 
