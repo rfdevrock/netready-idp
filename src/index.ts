@@ -82,6 +82,19 @@ interface NetReadyConfig {
   accessPro: string;
   authCookie: string;
 }
+import {
+  AccessCard,
+  AccessCardName,
+  Cookie,
+  ErrorResponse,
+  IdpErrorResponse,
+  IdpUserResponse,
+  LoginRequest,
+  NetReadyConfig,
+  NetreadyErrorType,
+  UserResponse,
+  ValidateResponse,
+} from './types';
 
 // Custom error
 
