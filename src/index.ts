@@ -3,85 +3,6 @@ import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
 import { CookieJar } from 'tough-cookie';
 import { readFile } from 'fs/promises';
-
-// Interfaces
-
-interface SessionUser extends IdpUserResponse {
-  code: string;
-  accessCard: boolean;
-  proCard: boolean;
-}
-
-interface ValidateResponse {
-  isTaken: boolean;
-}
-
-interface LoginRequest {
-  username: string;
-  password?: string;
-}
-
-interface IdpUserResponse {
-  username: string;
-  profilePictureMediaSourceId: string;
-  userId: number;
-  firstName: string;
-  lastName: string;
-  email: string;
-  telephone: string;
-}
-
-interface UserResponse extends IdpUserResponse {
-  accessCard: boolean;
-  proCard: boolean;
-  code: string;
-}
-
-type Idp403Response = {
-  status: 'failure';
-  error: string; //"Wrong email or password"
-}
-
-type Idp400Response = {
-  errors: Record<string, string[]>;
-  title: string; // One or more validation errors occurred.
-}
-
-type IdpErrorResponse = Idp400Response | Idp403Response;
-
-enum NetreadyErrorType {
-  credentials = 'credentials',
-  validation = 'validation'
-}
-
-type ErrorResponse = {
-  error: boolean;
-  errorType: NetreadyErrorType;
-};
-
-interface Cookie {
-  key: string;
-  value: string;
-}
-
-interface AccessCard {
-  userId: number;
-  accessCardId: string;
-  accessCardName: string;
-}
-
-enum AccessCardName {
-  connector = 'Connector',
-  pro = 'Pro Connector'
-}
-
-interface NetReadyConfig {
-  baseUrl: string;
-  apiKey: string;
-  accessCard: string;
-  accessPro: string;
-  authCookie: string;
-}
 import {
   AccessCard,
   AccessCardName,
@@ -97,6 +18,13 @@ import {
 } from './types';
 
 // Custom error
+const devEnv = ['local', 'staging'].includes(process?.env?.APP_ENV || '');
+
+function logMessage(title: string, context: unknown): void {
+  if (devEnv) {
+    console.warn(`NetReady IDP: ${title}, ${JSON.stringify(context)}`);
+  }
+}
 
 class NetReadyError extends Error {
   constructor(message: string, options: ErrorOptions) {
@@ -118,7 +46,8 @@ const client = wrapper(axios.create({ jar }));
  * @param email
  */
 async function validateEmail(
-  config: NetReadyConfig, email: string): Promise<boolean> {
+  config: NetReadyConfig, email: string,
+): Promise<ErrorResponse | { isTaken: boolean }> {
   try {
     const encodedEmail = encodeURIComponent(email);
 
@@ -127,12 +56,12 @@ async function validateEmail(
     } = await client.get<ValidateResponse>(
       `${config.baseUrl}/validate/email?apiKey=${config.apiKey}&email=${encodedEmail}`);
 
-    console.log('NetReady IDP: email validation', isTaken);
-    return isTaken;
+    logMessage('Email validation result', isTaken);
+    return { isTaken };
   } catch (e) {
     if (e instanceof AxiosError) {
-      console.log('NetReady IDP: email validation error', e?.response?.status);
-      return false;
+      logMessage('Email validation network error', e?.response?.status);
+      return { error: true, errorType: NetreadyErrorType.validation };
     }
     throw new NetReadyError(`NetReady ${email} validation failed`,
       { cause: e });
@@ -165,11 +94,11 @@ async function accessCards(config: NetReadyConfig, userId: number) {
         accessCardId === config.accessPro,
     );
 
-    console.log('NetReady IDP: cards validation', { accessCard, proCard });
+    logMessage('Access cards validation result', { accessCard, proCard });
     return { accessCard, proCard };
   } catch (e) {
     if (e instanceof AxiosError) {
-      console.log('NetReady IDP: cards validation error', e?.response?.status);
+      logMessage('Access cards validation network error', e?.response?.status);
       return { error: true, errorType: NetreadyErrorType.validation };
     }
     throw new NetReadyError('Getting access cards failed', { cause: e });
@@ -185,44 +114,49 @@ async function login(
   config: NetReadyConfig,
   user: LoginRequest): Promise<ErrorResponse | UserResponse> {
   try {
-    const validEmail = await validateEmail(config, user.username);
+    const emailCheck = await validateEmail(config, user.username);
 
-    if (validEmail) {
-      // login and get cookies
-      const {
-        data: userInfo,
-        config: { jar },
-      } = await client.post<
-        LoginRequest,
-        {
-          data: IdpUserResponse | IdpErrorResponse;
-          config: AxiosRequestConfig;
+    if ('isTaken' in emailCheck) {
+      if (emailCheck.isTaken) {
+        // login and get cookies
+        const {
+          data: userInfo,
+          config: { jar },
+        } = await client.post<
+          LoginRequest,
+          {
+            data: IdpUserResponse | IdpErrorResponse;
+            config: AxiosRequestConfig;
+          }
+        >(`${config.baseUrl}/user/login?apiKey=${config.apiKey}`, user);
+
+        if ('userId' in userInfo) {
+          // get access cookie for future access without credentials
+          const cookies = <Cookie[]>jar?.toJSON().cookies;
+          const code = cookies.find((c) => c.key === config.authCookie);
+          const cards = await accessCards(config, userInfo.userId);
+
+          if (code) {
+            logMessage('Login result', { user: user.username, success: true });
+            return {
+              ...userInfo,
+              accessCard: cards?.accessCard || false,
+              proCard: cards?.proCard || false,
+              code: code.value,
+            };
+          }
         }
-      >(`${config.baseUrl}/user/login?apiKey=${config.apiKey}`, user);
-
-      if ('userId' in userInfo) {
-        // get access cookie for future access without credentials
-        const cookies = <Cookie[]>jar?.toJSON().cookies;
-        const code = cookies.find((c) => c.key === config.authCookie);
-        const cards = await accessCards(config, userInfo.userId);
-
-        if (code && cards?.accessCard) {
-          console.log('NetReady IDP: login', true);
-          return {
-            ...userInfo,
-            accessCard: cards.accessCard,
-            proCard: cards.proCard,
-            code: code.value,
-          };
-        }
+      } else {
+        logMessage('Login result', { user: user.username, success: false });
+        return { error: true, errorType: NetreadyErrorType.credentials };
       }
     }
 
-    console.log('NetReady IDP: login', false);
+    logMessage('Login result', { user: user.username, success: false });
     return { error: true, errorType: NetreadyErrorType.validation };
   } catch (e) {
     if (e instanceof AxiosError) {
-      console.log('NetReady IDP: login error', e?.response?.status);
+      logMessage('Login network error', e?.response?.status);
       if (e?.response?.status === 403) {
         return { error: true, errorType: NetreadyErrorType.credentials };
       }
@@ -241,7 +175,7 @@ async function userInfo(
   config: NetReadyConfig, req: Request): Promise<ErrorResponse | UserResponse> {
   try {
     if (req.user) {
-      const { userId, code } = <SessionUser>req.user;
+      const { userId, code } = <UserResponse>req.user;
       const cards = await accessCards(config, userId);
 
       if (cards.accessCard) {
@@ -252,7 +186,7 @@ async function userInfo(
           },
         );
 
-        console.log('NetReady IDP: userInfo', true);
+        logMessage('User info result', { userId, success: true });
         return {
           ...user,
           code,
@@ -263,11 +197,11 @@ async function userInfo(
 
     }
 
-    console.log('NetReady IDP: userInfo', false);
+    logMessage('User info result', { success: false });
     return { error: true, errorType: NetreadyErrorType.validation };
   } catch (e) {
     if (e instanceof AxiosError) {
-      console.log('IDP: userInfo error: ', e?.response?.status)
+      logMessage('User info network error', e?.response?.status);
       return { error: true, errorType: NetreadyErrorType.validation };
     }
     throw new NetReadyError('Access to NetReady user info failed',
@@ -289,7 +223,6 @@ async function getNetreadyUser(
   config: NetReadyConfig, req: Request,
   user?: LoginRequest): Promise<ErrorResponse | UserResponse> {
   try {
-    console.log('IDP: getNetreadyUser');
     if (user) {
       return login(config, user);
     }
