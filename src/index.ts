@@ -48,7 +48,7 @@ const client = wrapper(axios.create({ jar }));
  */
 async function validateEmail(
   config: NetReadyConfig, email: string,
-): Promise<ErrorResponse | { isTaken: boolean }> {
+): Promise<ErrorResponse | { isTaken: boolean; error: false }> {
   try {
     const encodedEmail = encodeURIComponent(email);
 
@@ -58,7 +58,7 @@ async function validateEmail(
       `${config.baseUrl}/validate/email?apiKey=${config.apiKey}&email=${encodedEmail}`);
 
     logMessage('Email validation result', isTaken);
-    return { isTaken };
+    return { isTaken, error: false };
   } catch (e) {
     if (e instanceof AxiosError) {
       logMessage('Email validation network error', e?.response?.status);
@@ -75,7 +75,14 @@ async function validateEmail(
  * @param userId user ID from NetReady
  * @returns { accessCard: boolean, proCard: boolean }, otherwise: <ErrorResponse>
  */
-async function accessCards(config: NetReadyConfig, userId: number) {
+async function accessCards(
+  config: NetReadyConfig,
+  userId: number,
+): Promise<{
+  accessCard: boolean,
+  proCard: boolean,
+  error: false
+} | ErrorResponse> {
   try {
     const { data: accessCards } = await client.get<AccessCard[]>(
       `${config.baseUrl}/user/users/${userId}/accessCards?apiKey=${config.apiKey}`,
@@ -97,7 +104,7 @@ async function accessCards(config: NetReadyConfig, userId: number) {
     );
 
     logMessage('Access cards validation result', { accessCard, proCard });
-    return { accessCard, proCard };
+    return { accessCard, proCard, error: false };
   } catch (e) {
     if (e instanceof AxiosError) {
       logMessage('Access cards validation network error', e?.response?.status);
@@ -119,44 +126,47 @@ async function login(
   try {
     const emailCheck = await validateEmail(config, user.username);
 
-    if ('isTaken' in emailCheck) {
-      if (emailCheck.isTaken) {
-        // login and get cookies
-        const {
-          data: userInfo,
-          config: { jar },
-        } = await client.post<
-          LoginRequest,
-          {
-            data: IdpUserResponse | IdpErrorResponse;
-            config: AxiosRequestConfig;
-          }
-        >(`${config.baseUrl}/user/login?apiKey=${config.apiKey}`, user);
+    if (emailCheck.error && emailCheck.errorType === NetreadyErrorType.validation) {
+      logMessage('Login result', { user: user.username, success: false });
+      return { error: true, errorType: NetreadyErrorType.validation };
+    }
 
-        if ('userId' in userInfo) {
-          // get access cookie for future access without credentials
-          const cookies = <Cookie[]>jar?.toJSON().cookies;
-          const code = cookies.find((c) => c.key === config.authCookie);
-          const cards = await accessCards(config, userInfo.userId);
+    if (!emailCheck.error && emailCheck.isTaken) {
+      // login and get cookies
+      const {
+        data: userInfo,
+        config: { jar },
+      } = await client.post<
+        LoginRequest,
+        {
+          data: IdpUserResponse | IdpErrorResponse;
+          config: AxiosRequestConfig;
+        }
+      >(`${config.baseUrl}/user/login?apiKey=${config.apiKey}`, user);
 
-          if (code) {
-            logMessage('Login result', { user: user.username, success: true });
-            return {
-              ...userInfo,
-              accessCard: cards?.accessCard || false,
-              proCard: cards?.proCard || false,
-              code: code.value,
-            };
-          }
+      if ('userId' in userInfo) {
+        // get access cookie for future access without credentials
+        const cookies = <Cookie[]>jar?.toJSON().cookies;
+        const code = cookies.find((c) => c.key === config.authCookie);
+        const cards = await accessCards(config, userInfo.userId);
+
+        if (code && !cards.error) {
+          logMessage('Login result', { user: user.username, success: true });
+          return {
+            ...userInfo,
+            accessCard: cards.accessCard,
+            proCard: cards.proCard,
+            code: code.value,
+            error: false,
+          };
         }
       } else {
         logMessage('Login result', { user: user.username, success: false });
-        return { error: true, errorType: NetreadyErrorType.credentials };
+        return { error: true, errorType: NetreadyErrorType.validation };
       }
     }
-
     logMessage('Login result', { user: user.username, success: false });
-    return { error: true, errorType: NetreadyErrorType.validation };
+    return { error: true, errorType: NetreadyErrorType.credentials };
   } catch (e) {
     if (e instanceof AxiosError) {
       logMessage('Login network error', e?.response?.status);
@@ -182,7 +192,7 @@ async function userInfo(
       const { userId, code } = <UserResponse>req.user;
       const cards = await accessCards(config, userId);
 
-      if (cards.accessCard) {
+      if (!cards.error) {
         const { data: user } = await client.get<IdpUserResponse>(
           `${config.baseUrl}/user/users/${userId}/?apiKey=${config.apiKey}`,
           {
@@ -196,6 +206,7 @@ async function userInfo(
           code,
           accessCard: cards.accessCard,
           proCard: cards.proCard,
+          error: false,
         };
       }
 

@@ -21,6 +21,7 @@ export interface UserResponse extends IdpUserResponse {
   accessCard: boolean;
   proCard: boolean;
   code: string;
+  error: false;
 }
 
 type Idp403Response = {
@@ -41,7 +42,7 @@ export enum NetreadyErrorType {
 }
 
 export type ErrorResponse = {
-  error: boolean;
+  error: true;
   errorType: NetreadyErrorType;
 };
 
