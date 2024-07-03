@@ -79,18 +79,20 @@ async function validateEmail(
 async function accessCards(
   config: NetReadyConfig,
   userId: number,
-  code?: string
+  code?: string,
 ): Promise<{
   accessCard: boolean,
   proCard: boolean,
   error: false
 } | ErrorResponse> {
   try {
+    const reqConfig = code
+      ? { headers: { Cookie: `${config.authCookie}=${code}'` } }
+      : undefined;
+
     const { data: accessCards } = await client.get<AccessCard[]>(
       `${config.baseUrl}/user/users/${userId}/accessCards?apiKey=${config.apiKey}`,
-      {
-        headers: { Cookie: `${config.authCookie}=${code}'` }
-      },
+      reqConfig,
     );
 
     const accessCard = !!accessCards.find(({
@@ -131,7 +133,8 @@ async function login(
   try {
     const emailCheck = await validateEmail(config, user.username);
 
-    if (emailCheck.error && emailCheck.errorType === NetreadyErrorType.validation) {
+    if (emailCheck.error && emailCheck.errorType ===
+      NetreadyErrorType.validation) {
       logMessage('Login result', { user: user.username, success: false });
       return { error: true, errorType: NetreadyErrorType.validation };
     }
