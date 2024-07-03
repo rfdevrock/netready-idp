@@ -73,19 +73,26 @@ async function validateEmail(
  * Get user access cards
  * @param config Connection settings
  * @param userId user ID from NetReady
+ * @param code authorization code from cookies
  * @returns { accessCard: boolean, proCard: boolean }, otherwise: <ErrorResponse>
  */
 async function accessCards(
   config: NetReadyConfig,
   userId: number,
+  code?: string,
 ): Promise<{
   accessCard: boolean,
   proCard: boolean,
   error: false
 } | ErrorResponse> {
   try {
+    const reqConfig = code
+      ? { headers: { Cookie: `${config.authCookie}=${code}'` } }
+      : undefined;
+
     const { data: accessCards } = await client.get<AccessCard[]>(
       `${config.baseUrl}/user/users/${userId}/accessCards?apiKey=${config.apiKey}`,
+      reqConfig,
     );
 
     const accessCard = !!accessCards.find(({
@@ -126,7 +133,8 @@ async function login(
   try {
     const emailCheck = await validateEmail(config, user.username);
 
-    if (emailCheck.error && emailCheck.errorType === NetreadyErrorType.validation) {
+    if (emailCheck.error && emailCheck.errorType ===
+      NetreadyErrorType.validation) {
       logMessage('Login result', { user: user.username, success: false });
       return { error: true, errorType: NetreadyErrorType.validation };
     }
@@ -148,9 +156,9 @@ async function login(
         // get access cookie for future access without credentials
         const cookies = <Cookie[]>jar?.toJSON().cookies;
         const code = cookies.find((c) => c.key === config.authCookie);
-        const cards = await accessCards(config, userInfo.userId);
+        const cards = await accessCards(config, userInfo.userId, code?.value);
 
-        if (code && !cards.error) {
+        if (code?.value && !cards.error) {
           logMessage('Login result', { user: user.username, success: true });
           return {
             ...userInfo,
@@ -190,7 +198,7 @@ async function userInfo(
   try {
     if (req.user) {
       const { userId, code } = <UserResponse>req.user;
-      const cards = await accessCards(config, userId);
+      const cards = await accessCards(config, userId, code);
 
       if (!cards.error) {
         const { data: user } = await client.get<IdpUserResponse>(
