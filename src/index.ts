@@ -1,11 +1,7 @@
 import { Request } from 'express';
-import axios, { AxiosError, AxiosRequestConfig } from 'axios';
-import { wrapper } from 'axios-cookiejar-support';
-import { CookieJar } from 'tough-cookie';
 import { readFile } from 'fs/promises';
 import {
   AccessCard,
-  AccessCardName,
   Cookie,
   ErrorResponse,
   IdpErrorResponse,
@@ -15,7 +11,7 @@ import {
   NetreadyErrorType,
   UserResponse,
   ValidateResponse,
-} from './types';
+} from './types.js';
 
 // Custom error
 const devEnv = ['local', 'staging'].includes(process?.env?.APP_ENV || '');
@@ -33,11 +29,6 @@ class NetReadyError extends Error {
   }
 }
 
-// Axios instance
-
-const jar = new CookieJar();
-const client = wrapper(axios.create({ jar }));
-
 // Connections
 
 /**
@@ -47,25 +38,20 @@ const client = wrapper(axios.create({ jar }));
  * @returns if success {isTaken: boolean}, otherwise <ErrorResponse>
  */
 async function validateEmail(
-  config: NetReadyConfig, email: string,
+  config: NetReadyConfig,
+  email: string,
 ): Promise<ErrorResponse | { isTaken: boolean; error: false }> {
   try {
     const encodedEmail = encodeURIComponent(email);
 
-    const {
-      data: { isTaken },
-    } = await client.get<ValidateResponse>(
-      `${config.baseUrl}/validate/email?apiKey=${config.apiKey}&email=${encodedEmail}`);
+    const result = await fetch(`${config.baseUrl}/validate/email?apiKey=${config.apiKey}&email=${encodedEmail}`);
+    const data = (await result.json()) as ValidateResponse;
+    const isTaken = data?.isTaken;
 
     logMessage('Email validation result', isTaken);
     return { isTaken, error: false };
   } catch (e) {
-    if (e instanceof AxiosError) {
-      logMessage('Email validation network error', e?.response?.status);
-      return { error: true, errorType: NetreadyErrorType.validation };
-    }
-    throw new NetReadyError(`NetReady ${email} validation failed`,
-      { cause: e });
+    throw new NetReadyError(`NetReady ${email} validation failed`, { cause: e });
   }
 }
 
@@ -80,43 +66,32 @@ async function accessCards(
   config: NetReadyConfig,
   userId: number,
   code?: string,
-): Promise<{
-  accessCard: boolean,
-  proCard: boolean,
-  error: false
-} | ErrorResponse> {
+): Promise<
+  | {
+      accessCard: boolean;
+      proCard: boolean;
+      error: false;
+    }
+  | ErrorResponse
+> {
   try {
-    const reqConfig = code
-      ? { headers: { Cookie: `${config.authCookie}=${code}'` } }
-      : undefined;
+    const headers = { 'Content-Type': 'application/json', Cookie: code ? `${config.authCookie}=${code}'` : '' };
 
-    const { data: accessCards } = await client.get<AccessCard[]>(
-      `${config.baseUrl}/user/users/${userId}/accessCards?apiKey=${config.apiKey}`,
-      reqConfig,
-    );
+    const result = await fetch(`${config.baseUrl}/user/users/${userId}/accessCards?apiKey=${config.apiKey}`, {
+      headers,
+    });
 
-    const accessCard = !!accessCards.find(({
-        accessCardId,
-        accessCardName,
-      }) => accessCardName === AccessCardName.connector &&
-        accessCardId === config.accessCard,
-    );
+    const response = await result.json();
 
-    const proCard = !!accessCards.find(
-      ({
-        accessCardId,
-        accessCardName,
-      }) => accessCardName === AccessCardName.pro &&
-        accessCardId === config.accessPro,
-    );
+    const accessCards = response as AccessCard[];
+
+    const accessCard = !!accessCards.find(({ accessCardId }) => accessCardId === config.accessCard);
+
+    const proCard = !!accessCards.find(({ accessCardId }) => accessCardId === config.accessPro);
 
     logMessage('Access cards validation result', { accessCard, proCard });
     return { accessCard, proCard, error: false };
   } catch (e) {
-    if (e instanceof AxiosError) {
-      logMessage('Access cards validation network error', e?.response?.status);
-      return { error: true, errorType: NetreadyErrorType.validation };
-    }
     throw new NetReadyError('Getting access cards failed', { cause: e });
   }
 }
@@ -127,34 +102,43 @@ async function accessCards(
  * @param user username and password
  * @returns if success <UserResponse>, otherwise <ErrorResponse>
  */
-async function login(
-  config: NetReadyConfig,
-  user: LoginRequest): Promise<ErrorResponse | UserResponse> {
+async function login(config: NetReadyConfig, user: LoginRequest): Promise<ErrorResponse | UserResponse> {
   try {
     const emailCheck = await validateEmail(config, user.username);
 
-    if (emailCheck.error && emailCheck.errorType ===
-      NetreadyErrorType.validation) {
+    if (emailCheck.error && emailCheck.errorType === NetreadyErrorType.validation) {
       logMessage('Login result', { user: user.username, success: false });
       return { error: true, errorType: NetreadyErrorType.validation };
     }
 
     if (!emailCheck.error && emailCheck.isTaken) {
       // login and get cookies
-      const {
-        data: userInfo,
-        config: { jar },
-      } = await client.post<
-        LoginRequest,
-        {
-          data: IdpUserResponse | IdpErrorResponse;
-          config: AxiosRequestConfig;
-        }
-      >(`${config.baseUrl}/user/login?apiKey=${config.apiKey}`, user);
+      const result = await fetch(`${config.baseUrl}/user/login?apiKey=${config.apiKey}`, {
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        body: JSON.stringify(user),
+      });
+
+      if (result.status === 403) {
+        logMessage('Login result', { user: user.username, success: false });
+        return { error: true, errorType: NetreadyErrorType.credentials };
+      } else if (result.status !== 200) {
+        return { error: true, errorType: NetreadyErrorType.validation };
+      }
+
+      const userInfo = (await result.json()) as IdpUserResponse | IdpErrorResponse;
 
       if ('userId' in userInfo) {
         // get access cookie for future access without credentials
-        const cookies = <Cookie[]>jar?.toJSON().cookies;
+        const cookies =
+          result.headers
+            .get('Set-Cookie')
+            ?.split(';')
+            .map((c) => {
+              const [key, value] = c.split('=');
+              return { key, value };
+            }) || ([] as Cookie[]);
+
         const code = cookies.find((c) => c.key === config.authCookie);
         const cards = await accessCards(config, userInfo.userId, code?.value);
 
@@ -169,20 +153,13 @@ async function login(
           };
         }
       } else {
-        logMessage('Login result', { user: user.username, success: false });
+        logMessage('Login result', { user: user.username, success: false, userInfo });
         return { error: true, errorType: NetreadyErrorType.validation };
       }
     }
     logMessage('Login result', { user: user.username, success: false });
     return { error: true, errorType: NetreadyErrorType.credentials };
   } catch (e) {
-    if (e instanceof AxiosError) {
-      logMessage('Login network error', e?.response?.status);
-      if (e?.response?.status === 403) {
-        return { error: true, errorType: NetreadyErrorType.credentials };
-      }
-      return { error: true, errorType: NetreadyErrorType.validation };
-    }
     throw new NetReadyError('NetReady login failed', { cause: e });
   }
 }
@@ -193,20 +170,17 @@ async function login(
  * @param req Express.Request
  * @returns if success <UserResponse>, otherwise <ErrorResponse>
  */
-async function userInfo(
-  config: NetReadyConfig, req: Request): Promise<ErrorResponse | UserResponse> {
+async function userInfo(config: NetReadyConfig, req: Request): Promise<ErrorResponse | UserResponse> {
   try {
     if (req.user) {
-      const { userId, code } = <UserResponse>req.user;
+      const { userId, code } = req.user as UserResponse;
       const cards = await accessCards(config, userId, code);
 
       if (!cards.error) {
-        const { data: user } = await client.get<IdpUserResponse>(
-          `${config.baseUrl}/user/users/${userId}/?apiKey=${config.apiKey}`,
-          {
-            headers: { Cookie: `${config.authCookie}=${code}` },
-          },
-        );
+        const result = await fetch(`${config.baseUrl}/user/users/${userId}/?apiKey=${config.apiKey}`, {
+          headers: { Cookie: `${config.authCookie}=${code}` },
+        });
+        const user = (await result.json()) as IdpUserResponse;
 
         logMessage('User info result', { userId, success: true });
         return {
@@ -217,18 +191,12 @@ async function userInfo(
           error: false,
         };
       }
-
     }
 
     logMessage('User info result', { success: false });
     return { error: true, errorType: NetreadyErrorType.validation };
   } catch (e) {
-    if (e instanceof AxiosError) {
-      logMessage('User info network error', e?.response?.status);
-      return { error: true, errorType: NetreadyErrorType.validation };
-    }
-    throw new NetReadyError('Access to NetReady user info failed',
-      { cause: e });
+    throw new NetReadyError('Access to NetReady user info failed', { cause: e });
   }
 }
 
@@ -243,8 +211,10 @@ async function userInfo(
  */
 
 async function getNetreadyUser(
-  config: NetReadyConfig, req: Request,
-  user?: LoginRequest): Promise<ErrorResponse | UserResponse> {
+  config: NetReadyConfig,
+  req: Request,
+  user?: LoginRequest,
+): Promise<ErrorResponse | UserResponse> {
   try {
     if (user) {
       return login(config, user);
@@ -261,19 +231,12 @@ async function getNetreadyUser(
  * @param dataPath The path where login and password should be validated
  * @param redirectPath Path, where user should be redirected after login/signup process
  */
-async function generateHtml(
-  label: string, dataPath: string, redirectPath: string) {
+async function generateHtml(label: string, dataPath: string, redirectPath: string) {
   const template = await readFile(`${__dirname}/template.html`, 'utf-8');
-  return template.replaceAll('%HEADER%', label).
-    replace('%DATA_PATH%', dataPath).
-    replace('%REDIRECT_PATH%', redirectPath);
+  return template
+    .replaceAll('%HEADER%', label)
+    .replace('%DATA_PATH%', dataPath)
+    .replace('%REDIRECT_PATH%', redirectPath);
 }
 
-export {
-  validateEmail,
-  login,
-  userInfo,
-  getNetreadyUser,
-  NetReadyConfig,
-  generateHtml,
-};
+export { validateEmail, login, userInfo, getNetreadyUser, NetReadyConfig, generateHtml };

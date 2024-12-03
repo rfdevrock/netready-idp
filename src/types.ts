@@ -1,11 +1,11 @@
 export type ValidateResponse = {
   isTaken: boolean;
-}
+};
 
 export type LoginRequest = {
   username: string;
   password?: string;
-}
+};
 
 export interface IdpUserResponse {
   username: string;
@@ -27,18 +27,18 @@ export interface UserResponse extends IdpUserResponse {
 type Idp403Response = {
   status: 'failure';
   error: string; //"Wrong email or password"
-}
+};
 
 type Idp400Response = {
   errors: Record<string, string[]>;
   title: string; // One or more validation errors occurred.
-}
+};
 
 export type IdpErrorResponse = Idp400Response | Idp403Response;
 
 export enum NetreadyErrorType {
   credentials = 'credentials',
-  validation = 'validation'
+  validation = 'validation',
 }
 
 export type ErrorResponse = {
@@ -50,12 +50,7 @@ export type AccessCard = {
   userId: number;
   accessCardId: string;
   accessCardName: string;
-}
-
-export enum AccessCardName {
-  connector = 'Connector',
-  pro = 'Pro Connector'
-}
+};
 
 export interface NetReadyConfig {
   baseUrl: string;
@@ -68,4 +63,4 @@ export interface NetReadyConfig {
 export type Cookie = {
   key: string;
   value: string;
-}
+};
