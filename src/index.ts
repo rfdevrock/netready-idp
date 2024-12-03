@@ -220,7 +220,7 @@ async function getNetreadyUser(
       return login(config, user);
     }
     return userInfo(config, req);
-  } catch (e) {
+  } catch {
     return { error: true, errorType: NetreadyErrorType.validation };
   }
 }
