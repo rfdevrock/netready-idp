@@ -1,6 +1,9 @@
 {
   "name": "netready-idp",
   "description": "NetReady authorization module for PassportJs",
+  "author": "RapidFunnel",
+  "license": "MIT",
+  "repository": "github:rfdevrock/netready-idp",
   "version": "3.0.2",
   "type": "module",
   "main": "lib/cjs/index.js",
@@ -25,8 +28,6 @@
     "authorization",
     "express"
   ],
-  "author": "RapidFunnel",
-  "license": "MIT",
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^22.9.0",
